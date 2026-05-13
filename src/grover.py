@@ -4,7 +4,9 @@ from typing import Optional
 import numpy as np
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 from qiskit import transpile
+from qiskit.circuit.library import GroverOperator
 from qiskit_aer import Aer, AerSimulator
+from qiskit.quantum_info import Statevector
 
 
 # ORACLE builder
@@ -21,7 +23,7 @@ def build_phase_oracle(n_qubits: int, target_index: int) -> QuantumCircuit:
     # Init quantum circuit
     oracle_circuit = QuantumCircuit(n_qubits, name="Oracle")
 
-    binary_target = format(target_index, f"0{n_qubits}")
+    binary_target = format(target_index, f"0{n_qubits}b")
 
     # B1: Add X
     flip_positions = []
@@ -138,7 +140,7 @@ def run_grover_simulation(n_qubits: int, target_index: int, n_iterations: int, n
     return counts
 
 def calculate_success_probability(counts: dict, target_index: int, n_qubits: int) -> float:
-    total_shots = sum(counts.values)
+    total_shots = sum(counts.values())
 
     if total_shots == 0:
         return 0.0
@@ -159,3 +161,106 @@ def get_theoretical_success_probability(n_qubits: int, n_iterations: int) -> flo
 
     return prob
 
+
+# STATEVECTOR ANALYSIS
+
+def get_statevector_probabilities(n_qubits: int, target_index: int, n_iterations: int) -> np.ndarray:
+    circuit_no_measure = build_grover_circuit(n_qubits, target_index, n_iterations)
+    circuit_no_measure.remove_final_measurements(inplace=False)
+
+    circuit_sv = QuantumCircuit(n_qubits)
+    circuit_sv.h(range(n_qubits))
+
+    oracle = build_phase_oracle(n_qubits, target_index)
+    diffusion = build_diffusion_operator(n_qubits)
+
+    for _ in range(n_iterations):
+        circuit_sv.append(oracle, range(n_qubits))
+        circuit_sv.append(diffusion, range(n_qubits))
+
+    sv = Statevector.from_instruction(circuit_sv)
+
+    prob = np.abs(sv.data) ** 2
+
+    return prob
+
+# OPTIMAL ITERATION ANALYSIS
+
+# Check xem grover có chính xác không (so sánh mô phỏng mạch và lý thuyết)
+def analyze_iteration_sweep(n_qubits: int, target_index: int, max_iterations: Optional[int] = None) -> dict:
+    """Phân tích xs thành công theo số vòng lặp Grover."""
+
+    n_states = 2 ** n_qubits
+
+    # Tính số vòng lặp tối đa (2 chu kỳ)
+    if max_iterations is None:
+        max_iterations = int(2 * math.pi / 2 * math.sqrt(n_states)) + 1
+        max_iterations = min(max_iterations, 50) 
+
+    k_optimal = round(math.pi / 4 * math.sqrt(n_states))
+
+    iterations_list = list(range(max_iterations + 1))
+    theoratical_prob = []
+    simulated_probs = []
+
+    for k in iterations_list:
+        # Xác suất lý thuyết
+        theo_prob = get_theoretical_success_probability(n_qubits, k)
+        theoratical_prob.append(theo_prob)
+
+        # Xác suất mô phỏng
+        if k == 0:
+            # trạng thái uniform superposition
+            sim_prob = 1.0 / n_states
+        else:
+            probs = get_statevector_probabilities(n_qubits, target_index, k)
+            sim_prob = float(probs[target_index])
+        simulated_probs.append(sim_prob)
+
+    return {
+        "iterations": iterations_list,
+        "theoretical_probs": theoratical_prob,
+        "simulated_probs": simulated_probs,
+        "optimal_k": k_optimal,
+        "n_states": n_states,
+        "n_qubits": n_qubits,
+        "target_index": target_index,
+    }
+
+# Classical search baseline
+
+def classical_search_expected_queries(n_states: int, n_targets: int = 1) -> float:
+    return (n_states + 1) / (n_targets + 1)
+
+def quantum_seach_queries(n_states: int) -> float:
+    return math.pi / 4 * math.sqrt(n_states)
+
+# main demo
+if __name__ == "__main__":
+    print("Demo 3 qubits")
+
+    N_QUBITS = 3
+    TARGET = 5
+    N_SHOTS = 2048
+
+    n_states = 2 ** N_QUBITS
+    k_opt = round(math.pi / 4 * math.sqrt(n_states))
+    print(f"  Vòng lặp tối ưu: {k_opt}")
+
+    # XS Lý thuyết
+    theo_prob = get_theoretical_success_probability(N_QUBITS, k_opt)
+    print(f"\nXác suất lý thuyết (k={k_opt}): {theo_prob:.4f} ({theo_prob*100:.2f}%)")
+
+    counts = run_grover_simulation(N_QUBITS, TARGET, k_opt, N_SHOTS)
+    success_prob = calculate_success_probability(counts, TARGET, N_QUBITS)
+    print(f"Xác suất thực nghiệm         : {success_prob:.4f} ({success_prob*100:.2f}%)")
+
+     # Top 3 kết quả
+    print(f"\nTop 3 trạng thái đo được:")
+    sorted_counts = sorted(counts.items(), key=lambda x: x[1], reverse=True)
+    for bitstring, count in sorted_counts[:3]:
+        idx = int(bitstring, 2)
+        prob = count / N_SHOTS
+        marker = " <- TARGET" if idx == TARGET else ""
+        print(f"  |{bitstring}⟩ (={idx}): {count:4d} shots ({prob:.3f}){marker}")
+ 
