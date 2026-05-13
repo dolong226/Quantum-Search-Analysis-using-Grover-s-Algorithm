@@ -3,6 +3,8 @@ from typing import Optional
 
 import numpy as np
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
+from qiskit import transpile
+from qiskit_aer import Aer, AerSimulator
 
 
 # ORACLE builder
@@ -114,3 +116,46 @@ def build_grover_circuit(n_qubits: int, target_index: int, n_iterations: Optiona
     circuit.measure(qreg, creg)
 
     return circuit
+
+
+# SIMULATOR & RUNNER
+
+def run_grover_simulation(n_qubits: int, target_index: int, n_iterations: int, n_shots: int = 1024, noise_model=None) -> dict:
+    circuit = build_grover_circuit(n_qubits, target_index, n_iterations)
+
+    # Init simulator
+    if noise_model is not None:
+        simulator = AerSimulator(noise_model=noise_model)
+    else:
+        simulator = AerSimulator()
+
+    transpiled = transpile(circuit, simulator)
+    job = simulator.run(transpiled, shots=n_shots)
+    result = job.result()
+
+    counts = result.get_counts()
+
+    return counts
+
+def calculate_success_probability(counts: dict, target_index: int, n_qubits: int) -> float:
+    total_shots = sum(counts.values)
+
+    if total_shots == 0:
+        return 0.0
+    
+    target_bitstring = format(target_index, f"0{n_qubits}b")
+
+    target_count = counts.get(target_bitstring, 0)
+
+    success_prob = target_count / total_shots
+
+    return success_prob
+
+def get_theoretical_success_probability(n_qubits: int, n_iterations: int) -> float:
+    n_states = 2 ** n_qubits
+    theta = math.asin(1.0 / math.sqrt(n_states))
+    angle = (2 * n_iterations + 1) * theta
+    prob = math.sin(angle) ** 2
+
+    return prob
+
