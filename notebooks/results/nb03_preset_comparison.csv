@@ -1,0 +1,5 @@
+preset,probability,ideal_prob,random_baseline
+ideal,0.9429,0.9453,0.1250
+low_noise,0.8384,0.9453,0.1250
+medium_noise,0.5200,0.9453,0.1250
+high_noise,0.1641,0.9453,0.1250
