@@ -1,0 +1,7 @@
+noise_type,probability,degradation_abs,degradation_rel
+Lý tưởng (Không nhiễu),0.939453,0.005859,0.006198
+Depolarizing,0.298828,0.646484,0.683884
+Bit-Flip (X),0.665039,0.280273,0.296488
+Phase-Flip (Z),0.628906,0.316406,0.334711
+Amplitude Damping,0.746094,0.199219,0.210744
+Readout Error,0.921875,0.023438,0.024793
