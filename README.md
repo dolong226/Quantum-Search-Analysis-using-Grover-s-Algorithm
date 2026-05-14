@@ -19,12 +19,15 @@ Clone the repository:
 ```bash
 git clone https://github.com/dolong226/Quantum-Search-Analysis-using-Grover-s-Algorithm
 cd Quantum-Search-Analysis-using-Grover-s-Algorithm
+```
 
 ## Install dependencies
+```
 pip install -r requirements.txt
+```
 
 ## Project Structure
-
+```
 grover-algorithm/
 ├── src/
 │   ├── main.py           
@@ -37,7 +40,6 @@ grover-algorithm/
 ├── results/                
 ├── requirements.txt
 └── README.md
-
 ```
 
 ## References
